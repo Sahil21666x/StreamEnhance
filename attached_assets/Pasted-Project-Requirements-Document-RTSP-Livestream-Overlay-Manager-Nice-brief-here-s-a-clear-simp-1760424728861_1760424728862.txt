@@ -1,0 +1,266 @@
+Project Requirements Document — RTSP Livestream + Overlay Manager
+
+Nice brief — here's a clear, simple, developer-ready project requirements document for the app you described. I kept language simple and actionable so you (or a dev team) can start building right away.
+
+1. Project Summary
+
+A web app that lets visitors view a livestream video (from an RTSP URL) on the landing page and apply/manage custom overlays (logo/text) over the live video. Overlays can be created, read, updated, deleted (CRUD) and persisted. Tech stack: Flask (Python), MongoDB, React. RTSP playback will be made browser-compatible by server-side transcoding or a streaming gateway.
+
+2. Goals & Key Features
+
+User-facing
+
+Visit landing page and play livestream from an RTSP URL.
+
+Basic video controls: Play, Pause, Volume.
+
+Add overlays (image/logo or text) on top of livestream.
+
+Drag to position, resize overlays on UI.
+
+Save overlay settings (position, size, content) for reuse.
+
+Manage overlays: Create / Read / Update / Delete.
+
+Admin / Backend
+
+Expose CRUD REST API for overlays and settings.
+
+Persist overlay settings in MongoDB.
+
+Secure optional admin endpoints (token-based auth).
+
+Provide API and user documentation.
+
+Deliverables
+
+Code repo (backend + frontend).
+
+API documentation (endpoints, request/response).
+
+User documentation (setup, using RTSP, managing overlays).
+
+Deployment notes (Dockerfiles, recommended infra).
+
+3. High-level Architecture
+
+Frontend (React)
+
+Landing page with embedded video player (HTML5 player for HLS, or WebRTC player).
+
+Overlay editor UI (drag/resize/save).
+
+Calls backend APIs for loading/saving overlays.
+
+Backend (Flask)
+
+REST API for overlay CRUD, settings, and (optional) user auth.
+
+Service/process to ingest RTSP and produce browser-friendly stream (HLS or WebRTC).
+
+Streaming Gateway
+
+Use ffmpeg (or gstreamer) to transcode RTSP → HLS (recommended) or RTSP → WebRTC.
+
+Serve HLS via HTTP (nginx or Flask static) or use a small media server for WebRTC if low latency required.
+
+Database
+
+MongoDB for overlays and app settings.
+
+Deployment
+
+Docker containers for frontend, backend, and optionally an ffmpeg worker/nginx for HLS.
+
+Diagram (textual):
+Browser (React) ←→ Flask REST API ←→ MongoDB
+Browser (React) ←→ HLS/WEBRTC endpoint (served by transcoder + nginx)
+
+4. Streaming Options (implementation notes)
+
+Choose one based on latency requirements and complexity:
+
+A. RTSP → HLS (recommended for simplicity & wide browser support)
+
+Use ffmpeg to pull RTSP and create HLS segments (.m3u8).
+
+Serve .m3u8 and segments over HTTP via nginx or Flask static.
+
+Use HTML5 <video> or hls.js in the browser to play HLS.
+
+Pros: easy, robust; Cons: higher latency (~3–10s).
+
+B. RTSP → WebRTC (low latency)
+
+Use an SFU or tools like mediasoup, Janus, or pion/webrtc + ffmpeg transcode.
+
+More complex, low-latency.
+
+C. RTSP pass-through (not browser-native)
+
+Not supported directly — browsers don't play RTSP.
+
+5. Data Models (MongoDB)
+
+Collection: overlays
+
+{
+  "_id": ObjectId,
+  "userId": "<optional - for multi-user>",
+  "name": "LowerLeftLogo",
+  "type": "image" | "text",
+  "content": {            // image: URL; text: string
+    "src": "https://.../logo.png",
+    "text": "LIVE"
+  },
+  "position": { "x": 120, "y": 80 }, // px or percent, denote units in schema
+  "size": { "width": 150, "height": 50 }, // px or percent
+  "zIndex": 10,
+  "visible": true,
+  "styles": { "fontSize": 18, "color": "#ffffff", "background": "rgba(0,0,0,0)" },
+  "createdAt": ISODate,
+  "updatedAt": ISODate
+}
+
+
+Collection: stream_settings
+
+{
+  "_id": ObjectId,
+  "label": "MainCamera",
+  "rtspUrl": "rtsp://username:pass@ip:port/path",
+  "transcoding": { "type": "hls", "hlsPath": "/streams/main.m3u8" },
+  "defaultOverlays": [ObjectId, ObjectId],
+  "createdAt": ISODate,
+  "updatedAt": ISODate
+}
+
+6. API Specification (Flask REST — JSON)
+
+Base URL: /api/v1
+
+Overlay endpoints
+
+GET /overlays
+
+Query: ?userId=... (optional)
+
+Response: list of overlay documents.
+
+GET /overlays/<id>
+
+Response: overlay document.
+
+POST /overlays
+
+Body (example):
+
+{
+  "name": "TopRightText",
+  "type": "text",
+  "content": { "text": "LIVE" },
+  "position": { "x": "90%", "y": "5%" },
+  "size": { "width": "8%", "height": "auto" },
+  "zIndex": 20,
+  "styles": { "fontSize": 16, "color": "#ff0000" }
+}
+
+
+Response: created overlay (201).
+
+PUT /overlays/<id>
+
+Body: fields to update.
+
+Response: updated overlay.
+
+DELETE /overlays/<id>
+
+Response: success status.
+
+Stream settings endpoints
+
+GET /streams — list streams
+
+GET /streams/<id> — stream details (rtspUrl masked)
+
+POST /streams — add stream (rtspUrl stored)
+
+PUT /streams/<id> — update stream
+
+DELETE /streams/<id> — delete stream
+
+Optional: Auth endpoints
+
+POST /auth/login — returns token
+
+POST /auth/register — create user
+
+Example success response
+{
+  "success": true,
+  "data": { /* overlay document */ }
+}
+
+7. Frontend (React) — Components & Flow
+
+Main pages/components:
+
+LandingPage
+
+Video player (HLS via hls.js + HTML5 <video>).
+
+OverlayLayer (renders overlays DOM on top of video, absolute positioned).
+
+Play/Pause/Volume controls.
+
+OverlayEditor (floating panel)
+
+Add new overlay (text or image).
+
+Select overlay — show resize handles and draggable bounding box (use react-draggable + react-resizable or native CSS + Pointer events).
+
+Save / Update / Delete buttons (call backend).
+
+StreamManager (admin page)
+
+Add/modify RTSP stream entries.
+
+OverlayList — shows saved overlays and quick apply.
+
+UX notes:
+
+Overlays are rendered in a container with same aspect ratio as the video. Use percent units to remain responsive.
+
+Show "Test stream" input where user can paste RTSP and click "Start" — this tells backend to start transcoding (or will attempt to fetch the HLS URL if already configured).
+
+8. Implementation Details & Helpful Tips
+
+Transcoding with ffmpeg (sample command RTSP → HLS):
+
+ffmpeg -i "rtsp://..." -c:v copy -c:a aac -f hls \
+  -hls_time 2 -hls_list_size 3 -hls_flags delete_segments \
+  /var/www/streams/main.m3u8
+
+
+(For compatibility might need -c:v libx264 and bitrate settings.)
+
+Serving HLS
+
+Serve /streams/*.m3u8 and segment .ts via nginx for performance.
+
+Overlay rendering approach
+
+Do overlays in browser DOM on top of <video> for flexibility (no need to burn overlays into stream).
+
+If burning into final stream is required (so overlays are part of video delivered), perform overlay compositing server-side via ffmpeg filter_complex — but that prevents per-user dynamic overlays.
+
+Security
+
+Never expose raw RTSP credential in frontend. Store RTSP URLs server-side and protect management endpoints. Use basic token auth/API keys for admin operations.
+
+Sanitize user-provided text for overlays to avoid XSS.
+
+Responsiveness
+
+Store overlay positions/sizes as percentages relative to video container width/height.
