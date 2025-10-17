@@ -16,6 +16,8 @@ function StreamManager() {
   const loadStreams = async () => {
     try {
       const data = await getStreams()
+      console.log(data,'streams data');
+      
       setStreams(data)
     } catch (error) {
       console.error('Failed to load streams:', error)
@@ -38,7 +40,9 @@ function StreamManager() {
 
   const handleStart = async (id) => {
     try {
-      await startStream(id)
+    const res =  await startStream(id)
+    console.log(res);
+    
       alert('Stream transcoding started!')
     } catch (error) {
       console.error('Failed to start stream:', error)

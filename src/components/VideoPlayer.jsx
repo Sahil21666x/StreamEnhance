@@ -14,7 +14,8 @@ function VideoPlayer({ overlays, onOverlayUpdate }) {
       const hls = new Hls()
       hls.loadSource(hlsUrl)
       hls.attachMedia(videoRef.current)
-      
+       hls.startLoad();
+
       return () => {
         hls.destroy()
       }

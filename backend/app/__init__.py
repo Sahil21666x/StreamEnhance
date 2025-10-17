@@ -8,9 +8,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
-app.config['MONGODB_URI'] = os.getenv('DATABASE_URL', 'mongodb://localhost:27017/')
-app.config['DATABASE_NAME'] = os.getenv('DATABASE_NAME', 'rtsp_overlay_manager')
+
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+app.config['MONGODB_URI'] = os.getenv('DATABASE_URL')
+app.config['DATABASE_NAME'] = os.getenv('DATABASE_NAME')
 
 from app.routes import overlay_routes, stream_routes
 

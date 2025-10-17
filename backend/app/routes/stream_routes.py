@@ -65,6 +65,7 @@ def delete_stream(stream_id):
 
 @bp.route('/<stream_id>/start', methods=['POST'])
 def start_stream(stream_id):
+    
     try:
         ObjectId(stream_id)
     except (InvalidId, TypeError):
@@ -72,13 +73,35 @@ def start_stream(stream_id):
     
     db = get_db()
     stream = Stream.find_by_id(db, stream_id, mask_url=False)
+    print("Starting stream with ID:", stream_id)
     if stream and 'rtspUrl' in stream:
-        output_path = os.path.join(os.path.dirname(__file__), '../../streams/stream.m3u8')
-        start_transcoding(stream['rtspUrl'], output_path)
-        return jsonify({'success': True, 'message': 'Transcoding started'})
+    # Get absolute path to the backend directory
+     backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    
+    # Define the full path to the streams folder
+     streams_dir = os.path.join(backend_dir, 'streams')
+    
+    # Make sure the folder exists
+     os.makedirs(streams_dir, exist_ok=True)
+    
+    # Define output path for the HLS file
+     output_path = os.path.join(streams_dir, 'stream.m3u8')
+    
+     print("Output path:", output_path)
+     start_transcoding(stream['rtspUrl'], output_path)
+    
+     return jsonify({'success': True, 'message': 'Transcoding started'})
     return jsonify({'success': False, 'error': 'Stream not found'}), 404
 
 @bp.route('/output/<path:filename>', methods=['GET'])
 def serve_stream(filename):
     streams_dir = os.path.join(os.path.dirname(__file__), '../../streams')
     return send_from_directory(streams_dir, filename)
+
+@bp.route('/<stream_id>/status')
+def stream_status(stream_id):
+    output_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../streams/stream.m3u8'))
+    if os.path.exists(output_path):
+        return jsonify({'status': 'ready'})
+    return jsonify({'status': 'starting'})
+
